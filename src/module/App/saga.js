@@ -42,20 +42,15 @@ function* onParkingHistoryRequest({ payload }) {
   yield put(showLoader({ showLoader: false }));
 
   try {
-    // Extract page and limit from payload or use defaults
-    const { type, page = 1, limit = 10, isLoadMore = false } = payload || {};
+    const { type, page = 1, limit = 10, isLoadMore = false } = payload || {};  
+    const status = type === COMPLETED_BOOKINGS ? 'Completed' : '';
     
-    console.log('📦 Fetching trips - Type:', type, 'Page:', page, 'Limit:', limit, 'Load More:', isLoadMore);
-    
-    // Use the paginated endpoint
+    // Use the single endpoint with status parameter
     const response = yield get(
-      `driver/trips/pending?page=${page}&limit=${limit}`, 
+      `driver/trips/available?page=${page}&limit=${limit}&status=${status}`, 
       undefined, 
       false
     );
-
-    console.log('📦 API Response:', response.data);
-
     if (response.data && response.data.success === true) {
       const responseData = response.data.data || {};
       const trips = responseData.trips || [];
@@ -63,13 +58,17 @@ function* onParkingHistoryRequest({ payload }) {
         currentPage: page,
         totalPages: 1,
         totalCount: trips.length,
-        hasNextPage: false
       };
+      const hasNextPage = page < pagination.totalPages;
       
       yield put(parkingHistorySuccess({
         type: type,
         trips: trips,
-        pagination: pagination,
+        pagination: {
+          ...pagination,
+          hasNextPage: hasNextPage,
+          currentPage: page,
+        },
         isLoadMore: isLoadMore,
         page: page
       }));
@@ -103,15 +102,13 @@ function* onCarParkingRequest({ payload }) {
 
 export function* onTripDetailRequest({ payload }) {
   yield put(showLoader({ showLoader: false }));
-  
+  console.log('🔍 Fetching trip details for tripId:', payload.data.tripId);
   try {
     const response = yield get(
       `driver/trip/${payload.data.tripId}`,
       undefined,
       false,
     );
-    
-    console.log(response, 'responsetest');
     
     if (response.data) {
       const tripData = response.data.data;
@@ -137,6 +134,8 @@ export function* onTripDetailRequest({ payload }) {
     yield put(hideLoader());
   }
 }
+
+
 
 function* onAcceptRequest(action) {
   console.log('🔵 Accepting trip:', action.payload);

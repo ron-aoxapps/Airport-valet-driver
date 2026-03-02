@@ -108,7 +108,7 @@ const reducer = createReducer(initialState, builder => {
       const filteredRequests = state.pendingRequests.filter(
         req => req?._id !== updatedRequest._id
       );
-      
+      console.log('📊 After filtering - pending count:', filteredRequests) ;
       return {
         ...state,
         pendingRequests: filteredRequests,

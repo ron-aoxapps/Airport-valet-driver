@@ -50,7 +50,7 @@ const { width, height } = Dimensions.get('window');
 
 const TrackingFlow = () => {
   const dispatch = useDispatch();
-
+  const route = useRoute();
   const mapviewref = useRef();
   const userLiveMarkerRef = useRef();
   const isFocused = useIsFocused();
@@ -276,7 +276,7 @@ const TrackingFlow = () => {
           <View>
             <Text bold>Picked Up Location</Text>
             <Text>
-              {tripDetail.pickupLocation.address}
+              {tripDetail?.pickupLocation?.address}
 
             </Text>
           </View>
@@ -293,9 +293,9 @@ const TrackingFlow = () => {
 
           <View style={{ marginLeft: 5 }}>
             {tripDetail.parked ?
-              <Text semibold medium>Return : {moment(tripDetail.returnDate, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail.returnTime}</Text>
+              <Text semibold medium>Return : {moment(tripDetail.returnDate, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.returnTime}</Text>
               :
-              <Text semibold medium>Pickup : {moment(tripDetail.pickupDate, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail.pickupTime}</Text>
+              <Text semibold medium>Pickup : {moment(tripDetail.pickupDate, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.pickupTime}</Text>
             }
           </View>
         </View>

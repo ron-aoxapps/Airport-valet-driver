@@ -6,7 +6,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Text, Container, Row, EmptyList, GradientWrap, VectorIcon } from '../../../components';
 import { styles } from './styles';
 import { commonStyle } from '../../../styles/styles';
@@ -45,6 +45,7 @@ const MyBooking = () => {
   } = useSelector(state => state.app);
 
   const isFocused = useIsFocused();
+  const flatListRef = useRef(null);
 
   // Initial load and tab change
   useEffect(() => {
@@ -79,9 +80,13 @@ const MyBooking = () => {
       ? upcomingBookingCurrentPage 
       : pastBookingCurrentPage;
 
-    if (pagination?.hasNextPage && !isLoadingMore) {
+    // Check if there are more pages to load
+    const hasMorePages = pagination?.hasNextPage === true;
+    if (hasMorePages && !isLoadingMore) {
       const nextPage = currentPageNum + 1;
       fetchTrips(nextPage, true);
+    } else {
+      console.log('⏹️ No more pages to load or already loading');
     }
   }, [selectedTab, upcomingBookingPagination, pastBookingPagination, 
       upcomingBookingCurrentPage, pastBookingCurrentPage, isLoadingMore, fetchTrips]);
@@ -101,7 +106,76 @@ const MyBooking = () => {
     <EmptyList text={`No ${selectedTab.toLowerCase()} bookings found`} />
   );
 
-  const renderItem = ({ item }) => {
+  // Helper function to get vehicle info safely
+  const getVehicleInfo = (item) => {
+    if (item?.vehicleId) {
+      return {
+        name: item.vehicleId.carName || 'Vehicle',
+        plate: item.vehicleId.plateNumber || 'N/A'
+      };
+    } else if (item?.bookingId?.vehicle) {
+      return {
+        name: `${item.bookingId.vehicle.make || ''} ${item.bookingId.vehicle.model || ''}`.trim() || 'Vehicle',
+        plate: item.bookingId.vehicle.regno || 'N/A'
+      };
+    }
+    return { name: 'Vehicle', plate: 'N/A' };
+  };
+
+  // Helper function to get service name safely
+  const getServiceName = (item) => {
+    if (item?.servieId?.name) return item.servieId.name;
+    if (item?.parkingSpaceId?.name) return item.parkingSpaceId.name;
+    return 'Parking Service';
+  };
+
+  // Helper function to get address safely
+  const getAddress = (item) => {
+    if (item?.pickup?.address) return item.pickup.address;
+    if (item?.pickupLocation?.address) return item.pickupLocation.address;
+    if (item?.parkingSpaceId?.locationId?.address) return item.parkingSpaceId.locationId.address;
+    return 'Address not available';
+  };
+
+  // Helper function to get estimated cost safely
+  const getEstimatedCost = (item) => {
+    if (item?.estimatedCost) return item.estimatedCost;
+    if (item?.bookingId?.pricing?.total) return item.bookingId.pricing.total;
+    return 0;
+  };
+
+  // Helper function to get pickup date and time
+  const getPickupInfo = (item) => {
+    if (item?.bookingId?.from) {
+      const date = moment(item.bookingId.from);
+      return {
+        date: date.format('DD MMM YYYY'),
+        time: date.format('hh:mm A')
+      };
+    }
+    return { date: 'N/A', time: 'N/A' };
+  };
+
+  // Helper function to get return date and time
+  const getReturnInfo = (item) => {
+    if (item?.bookingId?.to) {
+      const date = moment(item.bookingId.to);
+      return {
+        date: date.format('DD MMM YYYY'),
+        time: date.format('hh:mm A')
+      };
+    }
+    return { date: 'N/A', time: 'N/A' };
+  };
+
+  const renderItem = ({ item, index }) => {
+    const vehicleInfo = getVehicleInfo(item);
+    const serviceName = getServiceName(item);
+    const address = getAddress(item);
+    const cost = getEstimatedCost(item);
+    const pickupInfo = getPickupInfo(item);
+    const returnInfo = getReturnInfo(item);
+
     return (
       <TouchableOpacity
         onPress={() => _onTripClick(item, dispatch)}
@@ -112,17 +186,17 @@ const MyBooking = () => {
             source={Images.vehicle}
           />
           <Text semibold style={{ paddingLeft: 10 }}>
-            {item?.vehicleId?.carName || item?.bookingId?.vehicle?.make || 'Vehicle'} |{' '}
+            {vehicleInfo.name} |{' '}
             <Text
               semibold
               style={{ paddingLeft: 10, ...commonStyle.uppercaseText }}>
-              {item?.vehicleId?.plateNumber || item?.bookingId?.vehicle?.regno || 'N/A'}
+              {vehicleInfo.plate}
             </Text>
           </Text>
         </View>
         <View style={commonStyle.sepratorStyle} />
         <Text semibold medium style={{ marginVertical: 5 }}>
-          {item?.servieId?.name || item?.parkingSpaceId?.name || 'Parking Service'}
+          {serviceName}
         </Text>
 
         <View style={styles.route}>
@@ -133,11 +207,7 @@ const MyBooking = () => {
             style={{ marginRight: 10 }}
           />
           <View style={{ flex: 1 }}>
-            <Text semibold>
-              {item?.pickupLocation?.address || 
-               item?.parkingSpaceId?.locationId?.address || 
-               'Address not available'}
-            </Text>
+            <Text semibold>{address}</Text>
           </View>
         </View>
 
@@ -152,11 +222,11 @@ const MyBooking = () => {
           <View style={styles.cardDetail}>
             {item.parked ? (
               <Text semibold medium>
-                Return : {moment(item.returnDate, 'DD-MM-YYYY').format("DD MMM YYYY")} {item.returnTime}
+                Return : {returnInfo.date} {returnInfo.time}
               </Text>
             ) : (
               <Text semibold medium>
-                Pickup : {moment(item.pickupDate, 'DD-MM-YYYY').format("DD MMM YYYY")} {item.pickupTime}
+                Pickup : {pickupInfo.date} {pickupInfo.time}
               </Text> 
             )}
           </View>
@@ -164,7 +234,7 @@ const MyBooking = () => {
         <View style={commonStyle.sepratorStyle} />
         <Row>
           <Text bold large>
-            $ {Number(item.estimatedCost || item?.bookingId?.pricing?.total || 0).toFixed(2)}
+            $ {Number(cost).toFixed(2)}
           </Text>
           <Text semibold medium textColor={Colors.primary}>
             {bookingStatus(item.tripStatus)}
@@ -185,17 +255,21 @@ const MyBooking = () => {
       />
 
       <FlatList
+        ref={flatListRef}
         data={currentData}
         renderItem={renderItem}
         keyExtractor={(item, index) => item._id || index.toString()}
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}
         onEndReached={onLoadMore}
-        onEndReachedThreshold={0.3}
+        onEndReachedThreshold={0.1}
         refreshing={refreshing}
         onRefresh={onRefresh}
         contentContainerStyle={localStyles.listContent}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
       />
     </Container>
   );
@@ -204,6 +278,69 @@ const MyBooking = () => {
 export const CurrentBooking = ({ currentBooking = [], dispatch }) => {
   if (currentBooking.length > 0) {
     const item = currentBooking[0];
+
+    const getVehicleInfo = (item) => {
+      if (item?.vehicleId) {
+        return {
+          name: item.vehicleId.carName || 'Vehicle',
+          plate: item.vehicleId.plateNumber || 'N/A'
+        };
+      } else if (item?.bookingId?.vehicle) {
+        return {
+          name: `${item.bookingId.vehicle.make || ''} ${item.bookingId.vehicle.model || ''}`.trim() || 'Vehicle',
+          plate: item.bookingId.vehicle.regno || 'N/A'
+        };
+      }
+      return { name: 'Vehicle', plate: 'N/A' };
+    };
+
+    const getServiceName = (item) => {
+      if (item?.servieId?.name) return item.servieId.name;
+      if (item?.parkingSpaceId?.name) return item.parkingSpaceId.name;
+      return 'Parking Service';
+    };
+
+    const getAddress = (item) => {
+      if (item?.pickup?.address) return item.pickup.address;
+      if (item?.pickupLocation?.address) return item.pickupLocation.address;
+      if (item?.parkingSpaceId?.locationId?.address) return item.parkingSpaceId.locationId.address;
+      return 'Address not available';
+    };
+
+    const getEstimatedCost = (item) => {
+      if (item?.estimatedCost) return item.estimatedCost;
+      if (item?.bookingId?.pricing?.total) return item.bookingId.pricing.total;
+      return 0;
+    };
+
+    const getPickupInfo = (item) => {
+      if (item?.bookingId?.from) {
+        const date = moment(item.bookingId.from);
+        return {
+          date: date.format('DD MMM YYYY'),
+          time: date.format('hh:mm A')
+        };
+      }
+      return { date: 'N/A', time: 'N/A' };
+    };
+
+    const getReturnInfo = (item) => {
+      if (item?.bookingId?.to) {
+        const date = moment(item.bookingId.to);
+        return {
+          date: date.format('DD MMM YYYY'),
+          time: date.format('hh:mm A')
+        };
+      }
+      return { date: 'N/A', time: 'N/A' };
+    };
+
+    const vehicleInfo = getVehicleInfo(item);
+    const serviceName = getServiceName(item);
+    const address = getAddress(item);
+    const cost = getEstimatedCost(item);
+    const pickupInfo = getPickupInfo(item);
+    const returnInfo = getReturnInfo(item);
 
     return (
       <View>
@@ -223,15 +360,15 @@ export const CurrentBooking = ({ currentBooking = [], dispatch }) => {
                 source={Images.vehicle}
               />
               <Text semibold style={{ paddingLeft: 10 }}>
-                {item?.vehicleId?.carName || item?.bookingId?.vehicle?.make || 'Vehicle'} |{' '}
+                {vehicleInfo.name} |{' '}
                 <Text semibold style={{ paddingLeft: 10, ...commonStyle.uppercaseText }}>
-                  {item?.vehicleId?.plateNumber || item?.bookingId?.vehicle?.regno || 'N/A'}
+                  {vehicleInfo.plate}
                 </Text>
               </Text>
             </View>
             <View style={commonStyle.sepratorStyle} />
             <Text semibold medium style={{ marginVertical: 5 }}>
-              {item?.servieId?.name || item?.parkingSpaceId?.name || 'Parking Service'}
+              {serviceName}
             </Text>
 
             <View style={styles.route}>
@@ -242,18 +379,34 @@ export const CurrentBooking = ({ currentBooking = [], dispatch }) => {
                 style={{ marginRight: 10 }}
               />
               <View style={{ flex: 1 }}>
-                <Text semibold>
-                  {item?.pickupLocation?.address || 
-                   item?.parkingSpaceId?.locationId?.address || 
-                   'Address not available'}
-                </Text>
+                <Text semibold>{address}</Text>
               </View>
             </View>
 
             <View style={commonStyle.sepratorStyle} />
+            <View style={commonStyle.row}>
+              <VectorIcon
+                type='AntDesign'
+                name='clockcircle'
+                size={22}
+                color={Colors.textColor}
+              />
+              <View style={styles.cardDetail}>
+                {item.parked ? (
+                  <Text semibold medium>
+                    Return : {returnInfo.date} {returnInfo.time}
+                  </Text>
+                ) : (
+                  <Text semibold medium>
+                    Pickup : {pickupInfo.date} {pickupInfo.time}
+                  </Text> 
+                )}
+              </View>
+            </View>
+            <View style={commonStyle.sepratorStyle} />
             <Row>
               <Text bold large>
-                $ {Number(item.estimatedCost || item?.bookingId?.pricing?.total || 0).toFixed(2)}
+                $ {Number(cost).toFixed(2)}
               </Text>
               <Text semibold medium textColor={Colors.primary}>
                 {bookingStatus(item.tripStatus)}
@@ -269,7 +422,7 @@ export const CurrentBooking = ({ currentBooking = [], dispatch }) => {
 
 const _onTripClick = (trip, dispatch) => {
   const tripStatus = trip.tripStatus;
-
+  console.log('Trip clicked:', trip._id, 'Status:', tripStatus);
   let payload = {
     detail: trip,
     requestVisible: tripStatus == CONSTANTS.FindingDrivers ? true : false,
