@@ -1,0 +1,63 @@
+const path = '../assets/images/';
+
+const Images = {
+  valet: require(path + 'valet.png'),
+  pickupPoint: require(path + 'pickup_location.png'),
+  dumpProfile: require(path + 'boy.png'),
+  splash: require(path + 'splash.png'),
+  page1: require(path + 'page1.png'),
+  page2: require(path + 'page2.png'),
+  page3: require(path + 'page3.png'),
+  user: require(path + 'ant-design_user-outlined.png'),
+  location: require(path + 'cil_location-pin.png'),
+  locationpin: require(path + 'locationpin.png'),
+  locationIcon: require(path + 'locationIcon.png'),
+  profileBlack: require(path + 'whh_profile.png'),
+  profilePlaceholder: require(path + 'profilePlaceholder.png'),
+  succcessIcon: require(path + 'succcessIcon.png'),
+
+  otp: require(path + 'otp.png'),
+  email: require(path + 'clarity_email-line.png'),
+  eye_off: require(path + 'eye-off2.png'),
+  profession: require(path + 'doctorOutline.png'),
+  lock: require(path + 'lock.png'),
+  eye_on: require(path + 'Show.png'),
+  google: require(path + 'google.png'),
+  facebook: require(path + 'facebook.png'),
+  apple: require(path + 'apple.png'),
+  bg: require(path + 'bg.png'),
+
+  other_wallet: require(path + 'other_wallet.png'),
+  nengu_wallet: require(path + 'nengu_wallet.png'),
+  crypto_wallet: require(path + 'crypto_wallet.png'),
+  patern: require(path + 'patern.png'),
+  support: require(path + 'support.png'),
+  otpImage: require(path + 'otpImage.png'),
+  loginImage: require(path + 'loginImage.png'),
+  transaction: require(path + 'transaction.png'),
+
+  callIcon: require(path + 'callIcon.png'),
+  callIconWhite: require(path + 'callIcon2.png'),
+  payment: require(path + 'payment.png'),
+  vehicle: require(path + 'vehicle.png'),
+  bookings: require(path + 'bookings.png'),
+  setting: require(path + 'setting.png'),
+  profile: require(path + 'profile.png'),
+  logout: require(path + 'logout.png'),
+  coupons: require(path + 'coupons.png'),
+  home: require(path + 'home.png'),
+  delete: require(path + 'delete.png'),
+  bin: require(path + 'bin1.png'),
+
+  color: require(path + 'color.png'),
+  plate: require(path + 'plate.png'),
+  offlineDriver: require(path + 'offlineDriver.png'),
+  ActiveStar: require(path + 'Active.png'),
+  navigation: require(path + 'navigation.png'),
+  
+  car_top_2: require(path + 'car_top_2.png'),
+  customerIcon: require(path + 'customerIcon.png'),
+  captain: require(path + 'captain.jpeg'),
+};
+
+export default Images;
