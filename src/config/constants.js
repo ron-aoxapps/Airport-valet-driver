@@ -10,8 +10,8 @@ export const CONSTANTS = {
   PickupArrived: 'PickupArrived',
   Pickup: 'Pickup',
 
-  ParkingInRoute: 'ParkingInroute',
-  ReturnInRoute: 'ReturnInroute',
+  ParkingInRoute: 'ParkingInRoute',
+  ReturnInRoute: 'ReturnInRoute',
   ReturnArrived: 'ReturnArrived',
   Parked: 'Parked',
 

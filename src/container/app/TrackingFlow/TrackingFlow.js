@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import React, { useEffect, useRef, useState } from 'react';
@@ -32,6 +33,10 @@ import {
   verifyTripOTPRequest,
   pickupInRouteRequest,
   arrivedAtCustomerLocationRequest,
+  carParkedRequest,
+  returnAcceptRequest,
+  returnArrivedRequest,
+  completeTripRequest, // Make sure to import this
 } from '../../../module/App/actions';
 import { CONSTANTS } from '../../../config';
 import { useLoaderSelector, useProfileSelector } from '../../../module/customSelector';
@@ -64,6 +69,7 @@ const TrackingFlow = () => {
   const { tripDetail, selectedTripDetail } = useSelector(state => state.app);
   console.log('tripDetail', selectedTripDetail)
   const { location } = useMyLocationHook();
+  console.log('full profile', profile); 
 
   const [driverLiveLocation, setDriverLiveLocation] = useState(
     new AnimatedRegion({
@@ -95,25 +101,8 @@ const TrackingFlow = () => {
     carParkedSuccessModal: false,
     text: '',
     code: '',
+    isOtpFilled: false,
   });
-
-  useEffect(() => {
-    if (isFocused) {
-      if (tripDetail?.tripStatus == CONSTANTS.Parked) {
-        setState(prev => ({
-          ...prev,
-          carParkedSuccessModal: true,
-          text: 'Vehicle Parked Successfully.',
-        }));
-      } else if (tripDetail?.tripStatus == CONSTANTS.Completed) {
-        setState(prev => ({
-          ...prev,
-          carParkedSuccessModal: true,
-          text: 'Vehicle Returned Successfully.',
-        }));
-      }
-    }
-  }, [tripDetail]);
 
   // Watch driver's location
   useEffect(() => {
@@ -211,42 +200,73 @@ const TrackingFlow = () => {
       });
     });
   };
-
-  const _verifyCode = () => {
-    const data = {
-      tripId: tripDetail._id,
-      tripOTP: state.code,
-    };
-
-    dispatch(verifyTripOTPRequest({ data }));
-  };
   
   const _onButtonPress = () => {
-    let data = {
-      tripId: tripDetail?._id,
-    };
-    console.log('Button Pressed with tripStatus:', tripDetail?.tripStatus);
-    if (tripDetail?.tripStatus === CONSTANTS.Accepted) {
-      alert('Pickup In Route', 'Are you sure you want to mark as arrived for pickup?');
+    console.log('Button pressed with trip status:', tripDetail?.tripStatus);
+    
+    if (tripDetail?.tripStatus === CONSTANTS.Accepted && profile?.driverStatus === 'FindingTrips') {
       dispatch(pickupInRouteRequest({
         tripId: tripDetail?._id,
+        data: { tripId: tripDetail?._id },
         callback: (response) => { 
           console.log('✅ Pickup In Route completed:', response);
         }
       }));
     } 
     else if (tripDetail?.tripStatus === CONSTANTS.PickupInRoute) {
-      alert('Arrived for Pickup', 'Are you sure you want to mark as arrived for pickup?');
       dispatch(arrivedAtCustomerLocationRequest({
         tripId: tripDetail?._id,
+        data: { tripId: tripDetail?._id },
         callback: (response) => {
           console.log('✅ Arrived At Customer Location completed:', response);
         }
       }));
     }
-    
-    else {
-      dispatch(tripStatusChangeAction({ data }));
+    else if (tripDetail?.tripStatus === CONSTANTS.ParkingInRoute) {
+      dispatch(carParkedRequest({ 
+        tripId: tripDetail?._id,
+        data: { tripId: tripDetail?._id },
+        callback: (response) => {
+          console.log('✅ Car Parked completed:', response);
+          navigationRef.navigate('MyBooking');
+        }
+      }));
+    }
+    else if(tripDetail?.tripStatus === CONSTANTS.ReturnInRoute) {
+      dispatch(returnArrivedRequest({
+        tripId: tripDetail?._id,
+        data: { tripId: tripDetail?._id },
+        callback: (response) => {
+          console.log('✅ Return Arrived completed:', response);
+        }
+      }));
+    }
+    else if(tripDetail?.tripStatus === CONSTANTS.ReturnArrived) {
+      // Check if OTP is filled
+      if (!state.code || state.code.length < 4) {
+        Alert.alert('OTP Required', 'Please enter the 4-digit OTP to complete the trip.');
+        return;
+      }
+      
+      console.log('📤 Sending OTP:', state.code, 'for trip completion');
+      
+      dispatch(completeTripRequest({
+        tripId: tripDetail?._id,
+        otp: state.code, // Send OTP in the request body
+        data: { 
+          tripId: tripDetail?._id,
+          otp: state.code 
+        },
+        callback: (response) => {
+          console.log('✅ Complete Trip completed:', response);
+          Alert.alert('Success', 'Trip completed successfully!');
+          navigationRef.navigate('MyBooking');
+        },
+        onError: (error) => {
+          console.log('❌ Complete Trip failed:', error);
+          Alert.alert('Error', error || 'Failed to complete trip');
+        }
+      }));
     }
   };
   
@@ -256,22 +276,38 @@ const TrackingFlow = () => {
     dispatch(profileRequest());
   };
 
+  // Handle OTP change
+  const handleOtpChange = (code) => {
+    setState(prev => ({ 
+      ...prev, 
+      code,
+      isOtpFilled: code.length === 4
+    }));
+  };
+
   const useButton = () => {
+    // Determine if button should be disabled
+    const isOtpRequired = tripDetail?.tripStatus === CONSTANTS.ReturnArrived;
+    const isOtpValid = state.code && state.code.length === 4;
+    const isDisabled = isOtpRequired ? !isOtpValid : false;
+    
     return (
       <View style={{ marginTop: 10 }}>
         <Button
-          loading={loading && (loadingRequest == tripStatusChangeAction || loadingRequest == pickupInRouteRequest)}
-          disabled={
-            // (tripDetail?.tripStatus == CONSTANTS.PickupArrived && !tripDetail?.verifiy) ||
-            (tripDetail?.tripStatus == CONSTANTS.ReturnArrived && !tripDetail?.verifiy)
-          }
+          loading={loading && (
+            loadingRequest === pickupInRouteRequest ||
+            loadingRequest === arrivedAtCustomerLocationRequest ||
+            loadingRequest === carParkedRequest ||
+            loadingRequest === returnAcceptRequest ||
+            loadingRequest === returnArrivedRequest ||
+            loadingRequest === completeTripRequest ||
+            loadingRequest === tripStatusChangeAction
+          )}
+          disabled={isDisabled}
           style={[
-            (
-              // tripDetail?.tripStatus == CONSTANTS.PickupArrived ||
-              tripDetail?.tripStatus == CONSTANTS.ReturnArrived) &&
-            !tripDetail?.verifiy && { backgroundColor: Colors.gray },
+            isDisabled && { backgroundColor: Colors.gray, opacity: 0.7 },
           ]}
-          title={buttonText(tripDetail)}
+          title={buttonText(tripDetail, state.isOtpFilled)}
           onPress={_onButtonPress}
         />
       </View>
@@ -345,41 +381,58 @@ const TrackingFlow = () => {
 
   const OTP = () => {
     if (
-      (tripDetail?.tripStatus == CONSTANTS.ReturnArrived ) &&
+      tripDetail?.tripStatus === CONSTANTS.ReturnArrived && 
       !tripDetail?.verifiy
     )
       return (
         <View>
           <View style={commonStyle.sepratorStyle} />
-          <Row>
+          <View style={{ marginVertical: 10 }}>
+            <Text style={{ textAlign: 'center', marginBottom: 5 }}>
+              Enter OTP to complete the trip
+            </Text>
+          </View>
+          <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <OTPInputView
               pinCount={4}
-              style={{ width: '50%', height: 50 }}
+              style={{ width: '60%', height: 60 }}
               code={state.code}
-              onCodeChanged={code => {
-                setState(prev => ({ ...prev, code }));
-              }}
-              autoFocusOnLoad={false}
+              onCodeChanged={handleOtpChange}
+              autoFocusOnLoad={true}
               placeholderCharacter="0"
               placeholderTextColor={Colors.placeholderTextColor}
-              codeInputFieldStyle={styles.underlineStyleBase}
+              codeInputFieldStyle={[
+                styles.underlineStyleBase,
+                state.code.length === 4 && { borderColor: Colors.success || 'green' }
+              ]}
               codeInputHighlightStyle={styles.underlineStyleHighLighted}
               onCodeFilled={code => {
                 console.log(`Code is ${code}, you are good to go!`);
               }}
             />
-            {(loading && loadingRequest == verifyTripOTPRequest)
-              ?
-              <View>
-                <ActivityIndicator
-                  color={Colors.primary}
-                />
+            
+            {/* Show OTP status indicator */}
+            {state.code.length === 4 ? (
+              <View style={{ 
+                backgroundColor: Colors.success || 'green', 
+                paddingHorizontal: 10, 
+                paddingVertical: 5, 
+                borderRadius: 15 
+              }}>
+                <Text style={{ color: 'white', fontSize: 12 }}>OTP Ready ✓</Text>
               </View>
-              :
-              <TouchableOpacity style={styles.verifyButton} onPress={_verifyCode}>
-                <Text textColor={Colors.primary}>Verify</Text>
-              </TouchableOpacity>
-            }
+            ) : (
+              <View style={{ 
+                backgroundColor: Colors.gray, 
+                paddingHorizontal: 10, 
+                paddingVertical: 5, 
+                borderRadius: 15 
+              }}>
+                <Text style={{ color: 'white', fontSize: 12 }}>
+                  {4 - (state.code?.length || 0)} digits left
+                </Text>
+              </View>
+            )}
           </Row>
         </View>
       );
@@ -392,8 +445,8 @@ const TrackingFlow = () => {
   };
   
   const destination = {
-    longitude: tripDetail?.pickup?.location.coordinates[0],
-    latitude: tripDetail?.pickup?.location.coordinates[1],
+    longitude: tripDetail?.pickup?.location?.coordinates?.[0] || 0,
+    latitude: tripDetail?.pickup?.location?.coordinates?.[1] || 0,
   };
 
   const floatingComponent = () => {
@@ -445,8 +498,8 @@ const TrackingFlow = () => {
         <TouchableOpacity
           onPress={() => {
             const region = {
-              latitude: tripDetail?.driverRefId?.driverLocation?.coordinates[1],
-              longitude: tripDetail?.driverRefId?.driverLocation?.coordinates[0],
+              latitude: tripDetail?.driverRefId?.driverLocation?.coordinates?.[1] || origin.latitude,
+              longitude: tripDetail?.driverRefId?.driverLocation?.coordinates?.[0] || origin.longitude,
               latitudeDelta: 0.00922,
               longitudeDelta: 0.00921,
             };
@@ -618,13 +671,15 @@ const TrackingFlow = () => {
 
 export default TrackingFlow;
 
-function buttonText(trip) {
+function buttonText(trip, isOtpFilled = false) {
+  if (!trip) return '';
+  
   const isParked = trip?.parked;
 
   switch (trip?.tripStatus) {
     case CONSTANTS.Accepted:
       if (isParked) {
-        return 'Return In Route';
+        return 'Accept Return';
       } else {
         return 'Pickup In Route';
       }
@@ -637,7 +692,7 @@ function buttonText(trip) {
     case CONSTANTS.ReturnInRoute:
       return 'Return Arrived';
     case CONSTANTS.ReturnArrived:
-      return 'Completed';
+      return isOtpFilled ? 'Complete Trip ✓' : 'Complete Trip';
     default:
       return '';
   }

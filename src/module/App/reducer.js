@@ -84,10 +84,13 @@ const reducer = createReducer(initialState, builder => {
 
   builder.addCase(addNewTripRequest, (state, action) => {
     const newRequest = action.payload;
-    console.log('➕ addNewTripRequest:', newRequest?._id, 'status:', newRequest?.tripStatus);
-    
-    if (newRequest.tripStatus !== 'FindingDrivers' && newRequest.tripStatus !== 'FindingDriver') {
-      console.log('⏭️ Not adding - status not FindingDrivers');
+    console.log('➕ addNewTripRequest:', newRequest?._id, 'new:', newRequest, 'status:', newRequest?.tripStatus);
+
+    // Allow Parked status to be added to pending requests
+    if (newRequest.tripStatus !== 'FindingDrivers' && 
+        newRequest.tripStatus !== 'FindingDriver' && 
+        newRequest.tripStatus !== 'Parked') {  // Added Parked status
+      console.log('⏭️ Not adding - status not FindingDrivers, FindingDriver, or Parked');
       return state;
     }
     
@@ -96,13 +99,13 @@ const reducer = createReducer(initialState, builder => {
     );
     
     if (!exists && newRequest?._id) {
-      console.log('✅ Adding new request to pending');
+      console.log('✅ Adding new request to pending for status:', newRequest?.tripStatus);
       const updatedPendingRequests = [...state.pendingRequests, newRequest];
       return {
         ...state,
         pendingRequests: updatedPendingRequests,
         tripDetail: state.pendingRequests.length === 0 ? newRequest : state.tripDetail,
-        requestVisible: true,
+        requestVisible: true, // Always show modal for Parked status as well
       };
     }
     return state;
@@ -117,13 +120,15 @@ const reducer = createReducer(initialState, builder => {
     console.log('📝 tripDetailSuccess:', updatedRequest._id, 'status:', updatedRequest.tripStatus);
     console.log('📝 Current pending count:', state.pendingRequests.length);
 
+    // Only remove from pending if status is not FindingDrivers, FindingDriver, or Parked
     if (updatedRequest.tripStatus !== 'FindingDrivers' && 
-        updatedRequest.tripStatus !== 'FindingDriver') {
+        updatedRequest.tripStatus !== 'FindingDriver' &&
+        updatedRequest.tripStatus !== 'Parked') {  // Keep Parked in pending
       console.log('🗑️ Removing trip from pending (status changed to:', updatedRequest.tripStatus);
       const filteredRequests = state.pendingRequests.filter(
         req => req?._id !== updatedRequest._id
       );
-      console.log('📊 After filtering - pending count:', filteredRequests);
+      console.log('📊 After filtering - pending count:', filteredRequests.length);
       return {
         ...state,
         pendingRequests: filteredRequests,
@@ -141,17 +146,17 @@ const reducer = createReducer(initialState, builder => {
       updatedPendingRequests = state.pendingRequests.map(req =>
         req?._id === updatedRequest._id ? updatedRequest : req
       );
-      console.log('🔄 Updated existing request');
+      console.log('🔄 Updated existing request for status:', updatedRequest.tripStatus);
     } else {
       updatedPendingRequests = [...state.pendingRequests, updatedRequest];
-      console.log('➕ Added new request from tripDetailSuccess');
+      console.log('➕ Added new request from tripDetailSuccess for status:', updatedRequest.tripStatus);
     }
 
     return {
       ...state,
       tripDetail: updatedRequest,
       pendingRequests: updatedPendingRequests,
-      requestVisible: requestVisible,
+      requestVisible: requestVisible, // This will be true for Parked status
     };
   });
 

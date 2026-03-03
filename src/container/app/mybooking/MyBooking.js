@@ -23,6 +23,7 @@ import { navigationRef } from '../../../navigation/rootNavigation';
 import { useIsFocused } from '@react-navigation/native';
 import { bookingStatus } from '../../../config/constants';
 import moment from 'moment';
+import { useProfileSelector } from '../../../module/customSelector';
 
 export const PENDING_BOOKINGS = 'PENDING';
 export const COMPLETED_BOOKINGS = 'COMPLETED';
@@ -33,7 +34,8 @@ const MyBooking = () => {
   const dispatch = useDispatch();
   const [selectedTab, setSelectedTab] = useState(PENDING_BOOKINGS);
   const [refreshing, setRefreshing] = useState(false);
-  
+  const profile = useProfileSelector();
+  console.log('👤 User profile:', profile);
   const { 
     upcomingBooking, 
     pastBooking,
@@ -435,7 +437,7 @@ const _onTripClick = (trip, dispatch) => {
     tripStatus == CONSTANTS.PickupArrived ||
     tripStatus == CONSTANTS.ParkingInRoute ||
     tripStatus == CONSTANTS.ReturnInRoute ||
-    tripStatus == CONSTANTS.ReturnArrived
+    tripStatus == CONSTANTS.ReturnArrived 
   ) {
     navigationRef.navigate(SCREEN_NAMES.TrackingFlow, { tripId: trip._id });
   } else if (tripStatus == CONSTANTS.FindingDrivers) {

@@ -9,6 +9,10 @@ import {
   acceptRequest,
   addNewTripRequest,
   arrivedAtCustomerLocationRequest,
+  carParkedRequest,
+  returnAcceptRequest,
+  returnArrivedRequest,
+  completeTripRequest,
   createCarParkingRequest,
   goOnlieOfflineRequest,
   parkingHistoryRequest,
@@ -56,6 +60,7 @@ function* onParkingHistoryRequest({ payload }) {
     );
     if (response.data && response.data.success === true) {
       const responseData = response.data.data || {};
+      console.log(responseData, '✅ Parking history fetched successfully for type:', type, 'Page:', page);
       const trips = responseData.trips || [];
       const pagination = responseData.pagination || {
         currentPage: page,
@@ -114,12 +119,13 @@ export function* onTripDetailRequest({ payload }) {
     );
     
     if (response.data) {
+      console.log('✅ Trip details fetched successfully:', response.data);
       const tripData = response.data.data;
       
       yield put(addNewTripRequest(tripData));
       
       let shouldShowModal = false;
-      if (tripData.tripStatus === 'FindingDrivers') {
+      if (tripData.tripStatus === 'FindingDrivers' || tripData.tripStatus === 'Parked') {
         shouldShowModal = true;
       }
       
@@ -172,7 +178,6 @@ function* onPickupInRouteRequest({ payload }) {
   
   try {
     const response = yield postAPI(`driver/trip/pickup-in-route/${payload.tripId}`, payload.data, false);
-    
     if (response.data && response.data.status === SUCCESS) {
       console.log('✅ Pickup In Route successful:', response.data);
       
@@ -191,18 +196,17 @@ function* onPickupInRouteRequest({ payload }) {
   }
 }
 
-// NEW Saga for arrived at customer location
+// Saga for arrived at customer location
 function* onArrivedAtCustomerLocationRequest({ payload }) {
   yield put(showLoader({ showLoader: true }));
   console.log('📍 Arrived At Customer Location for tripId:', payload.tripId);
   
   try {
-    const response = yield postAPI(`driver/trip/arrived-at-customer-location/${payload.tripId}`, undefined, false);
+    const response = yield postAPI(`driver/trip/arrived-at-customer-location/${payload.tripId}`, payload.data, false);
     
     if (response.data && response.data.status === SUCCESS) {
       console.log('✅ Arrived At Customer Location successful:', response.data);
       
-      // Fetch updated trip details
       yield put(tripDetailRequest({ data: { tripId: payload.tripId } }));
       
       if (payload.callback) {
@@ -213,6 +217,137 @@ function* onArrivedAtCustomerLocationRequest({ payload }) {
     }
   } catch (error) {
     console.log('🔴 Arrived At Customer Location error:', error);
+  } finally {
+    yield put(hideLoader());
+  }
+}
+
+// Saga for car parked
+function* onCarParkedRequest({ payload }) {
+  yield put(showLoader({ showLoader: true }));
+  console.log('🅿️ Car Parked for tripId:', payload.tripId);
+  
+  try {
+    const response = yield postAPI(`driver/trip/car-parked/${payload.tripId}`, payload.data, false);
+    
+    if (response.data && response.data.status === SUCCESS) {
+      console.log('✅ Car Parked successful:', response.data);
+      
+      // Fetch updated trip details
+      yield put(tripDetailRequest({ data: { tripId: payload.tripId } }));
+      
+      if (payload.callback) {
+        payload.callback(response.data.data);
+      }
+    } else {
+      console.log('❌ Car Parked failed:', response.data);
+    }
+  } catch (error) {
+    console.log('🔴 Car Parked error:', error);
+  } finally {
+    yield put(hideLoader());
+  }
+}
+
+// Saga for return accept
+function* onReturnAcceptRequest({ payload }) {
+  yield put(showLoader({ showLoader: true }));
+  console.log('🔄 Return Accept for tripId:', payload.tripId);
+  
+  try {
+    const response = yield postAPI(`driver/trip/return-accept/${payload.tripId}`, payload.data, false);
+    
+    if (response.data && response.data.status === SUCCESS) {
+      console.log('✅ Return Accept successful:', response.data);
+      
+      // Fetch updated trip details
+      yield put(tripDetailRequest({ data: { tripId: payload.tripId } }));
+      
+      if (payload.callback) {
+        payload.callback(response.data.data);
+      }
+    } else {
+      console.log('❌ Return Accept failed:', response.data);
+    }
+  } catch (error) {
+    console.log('🔴 Return Accept error:', error);
+  } finally {
+    yield put(hideLoader());
+  }
+}
+
+// Saga for return arrived
+function* onReturnArrivedRequest({ payload }) {
+  yield put(showLoader({ showLoader: true }));
+  console.log('🏁 Return Arrived for tripId:', payload.tripId);
+  
+  try {
+    const response = yield postAPI(`driver/trip/return-arrived/${payload.tripId}`, payload.data, false);
+    
+    if (response.data && response.data.status === SUCCESS) {
+      console.log('✅ Return Arrived successful:', response.data);
+      
+      // Fetch updated trip details
+      yield put(tripDetailRequest({ data: { tripId: payload.tripId } }));
+      
+      if (payload.callback) {
+        payload.callback(response.data.data);
+      }
+    } else {
+      console.log('❌ Return Arrived failed:', response.data);
+    }
+  } catch (error) {
+    console.log('🔴 Return Arrived error:', error);
+  } finally {
+    yield put(hideLoader());
+  }
+}
+
+// NEW Saga for complete trip with OTP
+function* onCompleteTripRequest({ payload }) {
+  yield put(showLoader({ showLoader: true }));
+  console.log('🎉 Complete Trip for tripId:', payload.tripId);
+  console.log('🔑 OTP provided:', payload.otp);
+  
+  try {
+    // Prepare request body with OTP
+    const requestBody = {
+      otp: payload.otp
+    };
+    
+    const response = yield postAPI(`driver/trip/complete/${payload.tripId}`, requestBody, false);
+    
+    if (response.data && response.data.status === SUCCESS) {
+      console.log('✅ Trip completed successfully:', response.data);
+      
+      // Fetch updated trip details
+      yield put(tripDetailRequest({ data: { tripId: payload.tripId } }));
+      
+      if (payload.callback) {
+        payload.callback(response.data.data);
+      }
+      
+      // Show success message
+      if (payload.showSuccessModal) {
+        // You can dispatch an action to show success modal
+        console.log('🎉 Trip completed!');
+      }
+      
+      // Navigate to MyBooking after successful completion
+      if (payload.navigateToMyBooking) {
+        navigationRef.navigate('MyBooking');
+      }
+    } else {
+      console.log('❌ Complete Trip failed:', response.data);
+      if (payload.onError) {
+        payload.onError(response.data?.message || 'Failed to complete trip');
+      }
+    }
+  } catch (error) {
+    console.log('🔴 Complete Trip error:', error);
+    if (payload.onError) {
+      payload.onError(error.message || 'Network error');
+    }
   } finally {
     yield put(hideLoader());
   }
@@ -309,7 +444,7 @@ function* onTripStatusChangeAction({ payload }) {
   switch (makeStatus) {
     case CONSTANTS.Accepted:
       if (parked) {
-        url = 'trip/returnInRoute';
+        url = `driver/trip/return-accept/${tripId}`;
       } else {
         url = 'trip/pickupInRoute';
       }
@@ -321,13 +456,13 @@ function* onTripStatusChangeAction({ payload }) {
       url = `driver/trip/arrived-at-customer-location/${tripId}`;
       break;
     case CONSTANTS.ParkingInRoute:
-      url = 'trip/parked';
+      url = `driver/trip/car-parked/${tripId}`;
       break;
     case CONSTANTS.ReturnInRoute:
-      url = 'trip/returnArrived';
+      url = `driver/trip/return-arrived/${tripId}`;
       break;
     case CONSTANTS.ReturnArrived:
-      url = 'trip/tripcompleted';
+      url = `driver/trip/complete/${tripId}`; // Use complete endpoint for ReturnArrived
       break;
     default:
       url = '';
@@ -335,7 +470,13 @@ function* onTripStatusChangeAction({ payload }) {
   }
 
   try {
-    const response = yield postAPI(url, payload.data, false);
+    // For ReturnArrived status, include OTP in the request body if available
+    let requestData = payload.data;
+    if (makeStatus === CONSTANTS.ReturnArrived && payload.data.otp) {
+      requestData = { otp: payload.data.otp };
+    }
+    
+    const response = yield postAPI(url, requestData, false);
 
     if (response.data.status == SUCCESS) {
       console.log('✅ Status change successful:', response.data);
@@ -380,6 +521,10 @@ function* sagaProfile() {
   yield takeEvery(rejectRequest, onRejectRequest);
   yield takeEvery(pickupInRouteRequest, onPickupInRouteRequest);
   yield takeEvery(arrivedAtCustomerLocationRequest, onArrivedAtCustomerLocationRequest);
+  yield takeEvery(carParkedRequest, onCarParkedRequest);
+  yield takeEvery(returnAcceptRequest, onReturnAcceptRequest);
+  yield takeEvery(returnArrivedRequest, onReturnArrivedRequest);
+  yield takeEvery(completeTripRequest, onCompleteTripRequest);
   yield takeEvery(tripStatusChangeAction, onTripStatusChangeAction);
   yield takeEvery(verifyTripOTPRequest, onVerifyTripOTPRequest);
 }

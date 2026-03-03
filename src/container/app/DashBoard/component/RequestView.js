@@ -12,6 +12,7 @@ import {
   acceptRequest,
   rejectRequest,
   closeRequestModalAction,
+  returnAcceptRequest,
 } from '../../../../module/App/actions';
 import { useLoaderSelector } from '../../../../module/customSelector';
 import { useMyLocationHook } from '../../../../module/Common/reducer';
@@ -87,11 +88,17 @@ const RequestView = () => {
     }
   }, [requestVisible, pendingRequests]);
 
-  const _onAccept = (tripId) => {
-    console.log('🟢 Accept button pressed for trip:', tripId);
-    if (!tripId) return;
-    dispatch(acceptRequest(tripId));
-  };
+ const _onAccept = (tripDetail) => {
+    console.log('🟢 Accept button pressed for trip:', tripDetail);
+    if (!tripDetail._id) return;
+    
+    if (tripDetail.parked) {
+        console.log('🔄 Accepting return trip with ID:', tripDetail._id);
+        dispatch(returnAcceptRequest( tripDetail._id));
+    } else {
+        dispatch(acceptRequest(tripDetail._id));
+    }
+};
 
   const _onReject = (tripId) => {
     console.log('🔴 Reject button pressed for trip:', tripId);
@@ -254,7 +261,7 @@ const RequestView = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.cardButton, styles.acceptCardButton]}
-                  onPress={() => _onAccept(tripDetail._id)}
+                  onPress={() => _onAccept(tripDetail)}
                   disabled={loading && loadingRequest === acceptRequest}
                 >
                   {loading && loadingRequest === acceptRequest ? (

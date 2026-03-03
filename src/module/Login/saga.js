@@ -76,14 +76,17 @@ function* onLoginByPasswordRequest({ payload }) {
     const response = yield postAPI(ENDPOINT.login, payload.data, false);
     if (response.data.message ==  "Login successful.") {
       const user = response.data.data;
-      console.log(user.token,'dataresponse')
+      console.log(response, 'dataresponse');
+      
       // Store authentication data
       yield setAuthenticationToken(user.token);
       yield setUserId(user.user.id);
       yield setConfiguration('token', user.token);
       yield setConfiguration('user_id', user.user.id);
-      console.log(response.data,'loginresponse')
+      console.log(response.data, 'loginresponse');
+      
       socketServices.initializeSocket(user.token, user.user.id, payload.dispatch);
+      
       // Update Redux state with user data
       yield put(loginSuccessAction(response.data));
       yield put(profileSuccess(response.data));
@@ -91,7 +94,7 @@ function* onLoginByPasswordRequest({ payload }) {
       yield put(hideLoader());
       
       // Navigate to main app
-   if (navigationRef.isReady()) {
+      if (navigationRef.isReady()) {
         navigationRef.reset({ routes: [{ name: 'App' }] });
         console.log('Navigation reset successful');
       } else {
@@ -101,14 +104,39 @@ function* onLoginByPasswordRequest({ payload }) {
       
       showToast(popupType.success, 'Login successful!', true);
     } else {
+      console.log('Login failed:', response);
       yield put(loginFailAction(response.data.message || 'Login failed'));
       yield put(hideLoader());
       showToast(popupType.error, response.data.message || 'Login failed', true);
     }
-  } catch (error) {
-    yield put(loginFailAction(error.message || 'Network error'));
+  } 
+  catch (error) {
+    console.log('Login error:', error);
+    
+    // Extract error message from the error object
+    let errorMessage = 'Network error. Please try again.';
+    
+    // Check if error has response data (for 400 errors)
+    if (error.response) {
+      console.log('Error response:', error.response);
+      
+      // Extract message from response data
+      if (error.response.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else {
+          errorMessage = JSON.stringify(error.response.data);
+        }
+      }
+    } 
+    
+    yield put(loginFailAction(errorMessage));
     yield put(hideLoader());
-    showToast(popupType.error, error.message || 'Network error', true);
+    showToast(popupType.error, errorMessage, true);
   }
 }
 

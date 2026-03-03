@@ -103,6 +103,7 @@ const LoginScreen = () => {
         data}));
       
     } catch (e) {
+      console.log('Login validation error:', e);
       showToast(popupType.error, e.errors[0], true);
     }
   };
