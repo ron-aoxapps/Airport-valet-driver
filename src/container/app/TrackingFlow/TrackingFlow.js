@@ -36,7 +36,7 @@ import {
   carParkedRequest,
   returnAcceptRequest,
   returnArrivedRequest,
-  completeTripRequest, // Make sure to import this
+  completeTripRequest,
 } from '../../../module/App/actions';
 import { CONSTANTS } from '../../../config';
 import { useLoaderSelector, useProfileSelector } from '../../../module/customSelector';
@@ -66,10 +66,13 @@ const TrackingFlow = () => {
   const profile = useProfileSelector();
   const { tripId } = route.params || {};
   const { loading, loadingRequest } = useLoaderSelector();
-  const { tripDetail, selectedTripDetail } = useSelector(state => state.app);
-  console.log('tripDetail', selectedTripDetail)
+  
+  // Use selectedTripDetail for the current trip being viewed
+  const { selectedTripDetail } = useSelector(state => state.app);
+  console.log('selectedTripDetail', selectedTripDetail);
+  
   const { location } = useMyLocationHook();
-  console.log('full profile', profile); 
+  console.log('full profile', profile);
 
   const [driverLiveLocation, setDriverLiveLocation] = useState(
     new AnimatedRegion({
@@ -80,11 +83,12 @@ const TrackingFlow = () => {
 
   const [customerLiveLocation, setCustomerLiveLocation] = useState(
     new AnimatedRegion({
-      latitude: tripDetail?.customerRefId?.userLocation?.coordinates?.[1] || 0,
-      longitude: tripDetail?.customerRefId?.userLocation?.coordinates?.[0] || 0,
+      latitude: selectedTripDetail?.customerRefId?.userLocation?.coordinates?.[1] || 0,
+      longitude: selectedTripDetail?.customerRefId?.userLocation?.coordinates?.[0] || 0,
     })
   );
 
+  // Fetch trip details when component mounts or tripId changes
   useEffect(() => {
     if (tripId) {
       dispatch(selectTripRequest({ data: { tripId } }));
@@ -151,11 +155,13 @@ const TrackingFlow = () => {
       longitudeDelta: 0.00921,
     };
     
-    mapviewref.current.animateCamera({
-      center: region,
-      pitch: 60,
-      heading: 0,
-    });
+    if (mapviewref.current) {
+      mapviewref.current.animateCamera({
+        center: region,
+        pitch: 60,
+        heading: 0,
+      });
+    }
 
     socketServices?.on('customer_location_change', (res) => {
       console.log('+++customer_location_change+++', res);
@@ -202,46 +208,46 @@ const TrackingFlow = () => {
   };
   
   const _onButtonPress = () => {
-    console.log('Button pressed with trip status:', tripDetail?.tripStatus);
+    console.log('Button pressed with trip status:', selectedTripDetail?.tripStatus);
     
-    if (tripDetail?.tripStatus === CONSTANTS.Accepted && profile?.driverStatus === 'FindingTrips') {
+    if (selectedTripDetail?.tripStatus === CONSTANTS.Accepted) {
       dispatch(pickupInRouteRequest({
-        tripId: tripDetail?._id,
-        data: { tripId: tripDetail?._id },
+        tripId: selectedTripDetail?._id,
+        data: { tripId: selectedTripDetail?._id },
         callback: (response) => { 
           console.log('✅ Pickup In Route completed:', response);
         }
       }));
     } 
-    else if (tripDetail?.tripStatus === CONSTANTS.PickupInRoute) {
+    else if (selectedTripDetail?.tripStatus === CONSTANTS.PickupInRoute) {
       dispatch(arrivedAtCustomerLocationRequest({
-        tripId: tripDetail?._id,
-        data: { tripId: tripDetail?._id },
+        tripId: selectedTripDetail?._id,
+        data: { tripId: selectedTripDetail?._id },
         callback: (response) => {
           console.log('✅ Arrived At Customer Location completed:', response);
         }
       }));
     }
-    else if (tripDetail?.tripStatus === CONSTANTS.ParkingInRoute) {
+    else if (selectedTripDetail?.tripStatus === CONSTANTS.ParkingInRoute) {
       dispatch(carParkedRequest({ 
-        tripId: tripDetail?._id,
-        data: { tripId: tripDetail?._id },
+        tripId: selectedTripDetail?._id,
+        data: { tripId: selectedTripDetail?._id },
         callback: (response) => {
           console.log('✅ Car Parked completed:', response);
           navigationRef.navigate('MyBooking');
         }
       }));
     }
-    else if(tripDetail?.tripStatus === CONSTANTS.ReturnInRoute) {
+    else if(selectedTripDetail?.tripStatus === CONSTANTS.ReturnInRoute) {
       dispatch(returnArrivedRequest({
-        tripId: tripDetail?._id,
-        data: { tripId: tripDetail?._id },
+        tripId: selectedTripDetail?._id,
+        data: { tripId: selectedTripDetail?._id },
         callback: (response) => {
           console.log('✅ Return Arrived completed:', response);
         }
       }));
     }
-    else if(tripDetail?.tripStatus === CONSTANTS.ReturnArrived) {
+    else if(selectedTripDetail?.tripStatus === CONSTANTS.ReturnArrived) {
       // Check if OTP is filled
       if (!state.code || state.code.length < 4) {
         Alert.alert('OTP Required', 'Please enter the 4-digit OTP to complete the trip.');
@@ -251,10 +257,10 @@ const TrackingFlow = () => {
       console.log('📤 Sending OTP:', state.code, 'for trip completion');
       
       dispatch(completeTripRequest({
-        tripId: tripDetail?._id,
-        otp: state.code, // Send OTP in the request body
+        tripId: selectedTripDetail?._id,
+        otp: state.code,
         data: { 
-          tripId: tripDetail?._id,
+          tripId: selectedTripDetail?._id,
           otp: state.code 
         },
         callback: (response) => {
@@ -287,7 +293,7 @@ const TrackingFlow = () => {
 
   const useButton = () => {
     // Determine if button should be disabled
-    const isOtpRequired = tripDetail?.tripStatus === CONSTANTS.ReturnArrived;
+    const isOtpRequired = selectedTripDetail?.tripStatus === CONSTANTS.ReturnArrived;
     const isOtpValid = state.code && state.code.length === 4;
     const isDisabled = isOtpRequired ? !isOtpValid : false;
     
@@ -307,7 +313,7 @@ const TrackingFlow = () => {
           style={[
             isDisabled && { backgroundColor: Colors.gray, opacity: 0.7 },
           ]}
-          title={buttonText(tripDetail, state.isOtpFilled)}
+          title={buttonText(selectedTripDetail, state.isOtpFilled)}
           onPress={_onButtonPress}
         />
       </View>
@@ -315,29 +321,33 @@ const TrackingFlow = () => {
   };
 
   const UserandCall = () => {
+    if (!selectedTripDetail?.customerId) return null;
+    
     return (
       <Row>
         <Row>
           <Image style={styles.smallImg} source={Images.profileBlack} />
           <Text bold>
             {` `}
-            {tripDetail?.customerId?.name}
+            {selectedTripDetail?.customerId?.name}
           </Text>
         </Row>
-        <CallIcon mobileNumber={tripDetail?.customerId?.phoneNumber} />
+        <CallIcon mobileNumber={selectedTripDetail?.customerId?.phoneNumber} />
       </Row>
     );
   };
 
   const VehicleDetail = () => {
+    if (!selectedTripDetail?.bookingId?.vehicle) return null;
+    
     return (
       <>
         <Row style={styles.pickupLocation}>
           <Image style={styles.smallImg} source={Images.vehicle} />
           <Text bold>
-            {` `} {tripDetail?.bookingId?.vehicle.make} {tripDetail?.bookingId?.vehicle.model} | {' '}
+            {` `} {selectedTripDetail?.bookingId?.vehicle.make} {selectedTripDetail?.bookingId?.vehicle.model} | {' '}
             <Text bold style={commonStyle.uppercaseText}>
-              {tripDetail?.bookingId?.vehicle.regno}
+              {selectedTripDetail?.bookingId?.vehicle.regno}
             </Text>
           </Text>
         </Row>
@@ -347,6 +357,8 @@ const TrackingFlow = () => {
   };
 
   const PickupLocation = () => {
+    if (!selectedTripDetail?.pickup) return null;
+    
     return (
       <>
         <Row style={styles.pickupLocation}>
@@ -354,7 +366,7 @@ const TrackingFlow = () => {
           <View>
             <Text bold>Picked Up Location</Text>
             <Text>
-              {tripDetail?.pickup?.address}
+              {selectedTripDetail?.pickup?.address}
             </Text>
           </View>
         </Row>
@@ -368,10 +380,10 @@ const TrackingFlow = () => {
           />
 
           <View style={{ marginLeft: 5 }}>
-            {tripDetail?.parked ?
-              <Text semibold medium>Return : {moment(tripDetail?.bookingId?.to, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.returnTime}</Text>
+            {selectedTripDetail?.parked ?
+              <Text semibold medium>Return : {moment(selectedTripDetail?.bookingId?.to, 'DD-MM-YYYY').format("DD-MM-YYYY")} {selectedTripDetail?.returnTime}</Text>
               :
-              <Text semibold medium>Pickup Date: {moment(tripDetail?.bookingId?.from, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.pickupTime}</Text>
+              <Text semibold medium>Pickup Date: {moment(selectedTripDetail?.bookingId?.from, 'DD-MM-YYYY').format("DD-MM-YYYY")} {selectedTripDetail?.pickupTime}</Text>
             }
           </View>
         </View>
@@ -381,8 +393,8 @@ const TrackingFlow = () => {
 
   const OTP = () => {
     if (
-      tripDetail?.tripStatus === CONSTANTS.ReturnArrived && 
-      !tripDetail?.verifiy
+      selectedTripDetail?.tripStatus === CONSTANTS.ReturnArrived && 
+      !selectedTripDetail?.verifiy
     )
       return (
         <View>
@@ -445,8 +457,8 @@ const TrackingFlow = () => {
   };
   
   const destination = {
-    longitude: tripDetail?.pickup?.location?.coordinates?.[0] || 0,
-    latitude: tripDetail?.pickup?.location?.coordinates?.[1] || 0,
+    longitude: selectedTripDetail?.pickup?.location?.coordinates?.[0] || 0,
+    latitude: selectedTripDetail?.pickup?.location?.coordinates?.[1] || 0,
   };
 
   const floatingComponent = () => {
@@ -498,17 +510,19 @@ const TrackingFlow = () => {
         <TouchableOpacity
           onPress={() => {
             const region = {
-              latitude: tripDetail?.driverRefId?.driverLocation?.coordinates?.[1] || origin.latitude,
-              longitude: tripDetail?.driverRefId?.driverLocation?.coordinates?.[0] || origin.longitude,
+              latitude: selectedTripDetail?.driverRefId?.driverLocation?.coordinates?.[1] || origin.latitude,
+              longitude: selectedTripDetail?.driverRefId?.driverLocation?.coordinates?.[0] || origin.longitude,
               latitudeDelta: 0.00922,
               longitudeDelta: 0.00921,
             };
 
-            mapviewref.current.animateCamera({
-              center: region,
-              pitch: 60,
-              heading: 0,
-            });
+            if (mapviewref.current) {
+              mapviewref.current.animateCamera({
+                center: region,
+                pitch: 60,
+                heading: 0,
+              });
+            }
           }}
           style={{
             marginLeft: 10,
@@ -530,6 +544,15 @@ const TrackingFlow = () => {
     );
   };
 
+  // Show loading state if no trip data
+  if (!selectedTripDetail) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS == 'ios' ? 'padding' : null}
@@ -550,11 +573,11 @@ const TrackingFlow = () => {
             }}>
             
             <MapViewWithDirections
-              type={tripDetail?.parked ? 'return' : 'pickup'}
+              type={selectedTripDetail?.parked ? 'return' : 'pickup'}
               driverOnly={
-                tripDetail?.tripStatus == CONSTANTS.PickupArrived ||
-                tripDetail?.tripStatus == CONSTANTS.ReturnArrived ||
-                tripDetail?.tripStatus == CONSTANTS.ParkingInRoute
+                selectedTripDetail?.tripStatus == CONSTANTS.PickupArrived ||
+                selectedTripDetail?.tripStatus == CONSTANTS.ReturnArrived ||
+                selectedTripDetail?.tripStatus == CONSTANTS.ParkingInRoute
               }
               sourceIcon={Images.car_top_2}
               sourceIconStyle={{
@@ -565,7 +588,7 @@ const TrackingFlow = () => {
                 overflow: "hidden",
                 padding: 2
               }}
-              destinationIcon={(tripDetail?.parked) ? Images.locationpin : Images.car_top_2}
+              destinationIcon={(selectedTripDetail?.parked) ? Images.locationpin : Images.car_top_2}
               origin={origin}
               destination={destination}
               onReady={result => {
@@ -611,7 +634,7 @@ const TrackingFlow = () => {
             </MarkerAnimated>
 
             {/* Customer Marker - Person Icon */}
-            {tripDetail?.tripStatus != CONSTANTS.ParkingInRoute && (
+            {selectedTripDetail?.tripStatus != CONSTANTS.ParkingInRoute && (
               <MarkerAnimated
                 identifier={'Customer'}
                 flat={false}
