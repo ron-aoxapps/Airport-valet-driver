@@ -6,12 +6,12 @@ export const CONSTANTS = {
   Accepted: 'Accepted',
   Cancelled: 'Cancelled',
   Rejected: 'Rejected',
-  PickupInRoute: 'PickupInRoute',
+  PickupInRoute: 'PickupInroute',
   PickupArrived: 'PickupArrived',
   Pickup: 'Pickup',
 
-  ParkingInRoute: 'ParkingInRoute',
-  ReturnInRoute: 'ReturnInRoute',
+  ParkingInRoute: 'ParkingInroute',
+  ReturnInRoute: 'ReturnInroute',
   ReturnArrived: 'ReturnArrived',
   Parked: 'Parked',
 

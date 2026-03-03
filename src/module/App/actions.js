@@ -16,10 +16,17 @@ export const addNewTripRequest = createAction('ADD_NEW_TRIP_REQUEST');
 export const selectTripRequest = createAction('SELECT_TRIP_REQUEST');
 export const removeTripRequest = createAction('REMOVE_TRIP_REQUEST');
 
+// Action for selecting trip detail from a separate request
+export const selectTripDetailSuccess = createAction('SELECT_TRIP_DETAIL_SUCCESS');
+
 export const closeRequestModalAction = createAction('closeRequestModal');
 
 export const acceptRequest = createAction('acceptRequest/request');
 export const rejectRequest = createAction('rejectRequest/request');
+
+// Specific actions for different statuses
+export const pickupInRouteRequest = createAction('pickupInRoute/request');
+export const arrivedAtCustomerLocationRequest = createAction('arrivedAtCustomerLocation/request');
 
 export const tripStatusChangeAction = createAction('tripStatusChange/request');
 export const driverArrivedAction = createAction('driverArrived/request');

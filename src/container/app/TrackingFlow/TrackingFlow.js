@@ -15,11 +15,9 @@ import MapView, { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
 import BottomSheet from './component/BottomSheet';
 import {
   Button,
-  Container,
   Header,
   Row,
   Text,
-  TextInput,
   VectorIcon,
 } from '../../../components';
 import { Colors, Images } from '../../../constants';
@@ -28,13 +26,17 @@ import CallIcon from './component/CallIcon';
 import { useDispatch, useSelector } from 'react-redux';
 import { styles } from './styles';
 import {
+  selectTripRequest,
+  tripDetailRequest,
   tripStatusChangeAction,
   verifyTripOTPRequest,
+  pickupInRouteRequest,
+  arrivedAtCustomerLocationRequest,
 } from '../../../module/App/actions';
 import { CONSTANTS } from '../../../config';
 import { useLoaderSelector, useProfileSelector } from '../../../module/customSelector';
 import { commonStyle } from '../../../styles/styles';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useRoute } from '@react-navigation/native';
 import SuccessModal from '../../../components/Common/SuccessModal';
 import { navigationRef } from '../../../navigation/rootNavigation';
 import { profileRequest } from '../../../module/Profile/actions';
@@ -46,6 +48,7 @@ import { getCurrentLocation } from '../../../utils/commonFunction';
 import socketServices from '../../../utils/socket';
 import { showLocation } from 'react-native-map-link';
 import moment from 'moment';
+
 const { width, height } = Dimensions.get('window');
 
 const TrackingFlow = () => {
@@ -53,20 +56,34 @@ const TrackingFlow = () => {
   const route = useRoute();
   const mapviewref = useRef();
   const userLiveMarkerRef = useRef();
+  const driverMarkerRef = useRef();
   const isFocused = useIsFocused();
   const profile = useProfileSelector();
-
+  const { tripId } = route.params || {};
   const { loading, loadingRequest } = useLoaderSelector();
-  const { tripDetail } = useSelector(state => state.app);
-  console.log('tripDetail', tripDetail)
+  const { tripDetail, selectedTripDetail } = useSelector(state => state.app);
+  console.log('tripDetail', selectedTripDetail)
   const { location } = useMyLocationHook();
 
-  const [userLiveLocation, setUserLocation] = useState(
+  const [driverLiveLocation, setDriverLiveLocation] = useState(
     new AnimatedRegion({
-      latitude: tripDetail?.customerRefId?.userLocation?.coordinates[1],
-      longitude: tripDetail?.customerRefId?.userLocation?.coordinates[0],
+      latitude: location?.latitude || 0,
+      longitude: location?.longitude || 0,
     })
-  )
+  );
+
+  const [customerLiveLocation, setCustomerLiveLocation] = useState(
+    new AnimatedRegion({
+      latitude: tripDetail?.customerRefId?.userLocation?.coordinates?.[1] || 0,
+      longitude: tripDetail?.customerRefId?.userLocation?.coordinates?.[0] || 0,
+    })
+  );
+
+  useEffect(() => {
+    if (tripId) {
+      dispatch(selectTripRequest({ data: { tripId } }));
+    }
+  }, [tripId, dispatch]);
 
   const [myLocation, setMyLocation] = useState({
     ...location,
@@ -82,13 +99,13 @@ const TrackingFlow = () => {
 
   useEffect(() => {
     if (isFocused) {
-      if (tripDetail.tripStatus == CONSTANTS.Parked) {
+      if (tripDetail?.tripStatus == CONSTANTS.Parked) {
         setState(prev => ({
           ...prev,
           carParkedSuccessModal: true,
           text: 'Vehicle Parked Successfully.',
         }));
-      } else if (tripDetail.tripStatus == CONSTANTS.Completed) {
+      } else if (tripDetail?.tripStatus == CONSTANTS.Completed) {
         setState(prev => ({
           ...prev,
           carParkedSuccessModal: true,
@@ -98,28 +115,43 @@ const TrackingFlow = () => {
     }
   }, [tripDetail]);
 
-  // useEffect(() => {
-  //   const watchId = Geolocation.watchPosition(position => {
-  //     let angle = position.coords.heading;
-  //     setMyLocation({
-  //       latitude: position.coords.latitude,
-  //       longitude: position.coords.longitude,
-  //       angle: angle,
-  //       error: null,
-  //     });
-  //     console.log('position', position);
+  // Watch driver's location
+  useEffect(() => {
+    const watchId = Geolocation.watchPosition(
+      position => {
+        const newCoordinate = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
 
+        if (Platform.OS == 'android') {
+          if (driverMarkerRef?.current) {
+            driverMarkerRef?.current?.animateMarkerToCoordinate(newCoordinate, 1000);
+          }
+        } else {
+          driverLiveLocation.timing(newCoordinate).start();
+        }
 
+        const data = {
+          driverId: profile?._id,
+          driverLocation: {
+            lng: position.coords.longitude,
+            lat: position.coords.latitude,
+          },
+        };
+        socketServices?.emit('driversocket', data, res => {
+          console.log('+++driversocket+++', res);
+        });
+      },
+      error => console.log('Watch position error:', error),
+      { enableHighAccuracy: true, distanceFilter: 10, interval: 5000 }
+    );
 
-
-  //   });
-
-  //   return () => {
-  //     Geolocation?.clearWatch(watchId);
-  //     Geolocation?.stopObserving();
-  //   };
-  // }, []);
-
+    return () => {
+      Geolocation?.clearWatch(watchId);
+      Geolocation?.stopObserving();
+    };
+  }, []);
 
   useEffect(() => {
     _getCurrentLocation();
@@ -129,22 +161,21 @@ const TrackingFlow = () => {
       latitudeDelta: 0.00922,
       longitudeDelta: 0.00921,
     };
-    // mapviewref?.current?.animateToRegion(region);
+    
     mapviewref.current.animateCamera({
       center: region,
       pitch: 60,
       heading: 0,
-  })
-
+    });
 
     socketServices?.on('customer_location_change', (res) => {
-      console.log('+++customer_location_change+++', res)
+      console.log('+++customer_location_change+++', res);
       const region = {
         latitude: res?.userLocation?.coordinates[1],
         longitude: res?.userLocation?.coordinates[0],
         latitudeDelta: 0.00922,
         longitudeDelta: 0.00921,
-      }
+      };
 
       const newCoordinate = {
         latitude: region.latitude,
@@ -153,25 +184,17 @@ const TrackingFlow = () => {
 
       if (Platform.OS == 'android') {
         if (userLiveMarkerRef?.current) {
-          userLiveMarkerRef?.current?.animateMarkerToCoordinate(region, 5000)
+          userLiveMarkerRef?.current?.animateMarkerToCoordinate(region, 5000);
         }
       } else {
-        userLiveLocation.timing(newCoordinate).start()
+        customerLiveLocation.timing(newCoordinate).start();
       }
-
-      // if (liveLocationRef.current)
-      // mapviewref?.current?.animateToRegion(region);
-
-
-
-    })
+    });
 
     return () => {
-      socketServices.removeListener('customer_location_change')
-    }
-
+      socketServices.removeListener('customer_location_change');
+    };
   }, []);
-
 
   const _getCurrentLocation = () => {
     getCurrentLocation(location => {
@@ -189,7 +212,6 @@ const TrackingFlow = () => {
     });
   };
 
-
   const _verifyCode = () => {
     const data = {
       tripId: tripDetail._id,
@@ -198,14 +220,38 @@ const TrackingFlow = () => {
 
     dispatch(verifyTripOTPRequest({ data }));
   };
+  
   const _onButtonPress = () => {
     let data = {
-      tripId: tripDetail._id,
-      tripStatus: tripDetail.tripStatus,
-      parked: tripDetail.parked,
+      tripId: tripDetail?._id,
     };
-    dispatch(tripStatusChangeAction({ data }));
+    console.log('Button Pressed with tripStatus:', tripDetail?.tripStatus);
+    // Use specific action for PickupInRoute
+    if (tripDetail?.tripStatus === CONSTANTS.Accepted) {
+      alert('Pickup In Route', 'Are you sure you want to mark as arrived for pickup?');
+      dispatch(pickupInRouteRequest({
+        tripId: tripDetail?._id,
+        callback: (response) => { 
+          console.log('✅ Pickup In Route completed:', response);
+        }
+      }));
+    } 
+    else if (tripDetail?.tripStatus === CONSTANTS.PickupInRoute) {
+      alert('Arrived for Pickup', 'Are you sure you want to mark as arrived for pickup?');
+      dispatch(arrivedAtCustomerLocationRequest({
+        tripId: tripDetail?._id,
+        callback: (response) => {
+          console.log('✅ Arrived At Customer Location completed:', response);
+        }
+      }));
+    }
+    
+    else {
+      // Use general status change for other statuses
+      dispatch(tripStatusChangeAction({ data }));
+    }
   };
+  
   const _onParkedModalClick = () => {
     setState(prev => ({ ...prev, carParkedSuccessModal: false }));
     navigationRef.goBack();
@@ -216,15 +262,16 @@ const TrackingFlow = () => {
     return (
       <View style={{ marginTop: 10 }}>
         <Button
-          loading={loading && loadingRequest == tripStatusChangeAction}
+          loading={loading && (loadingRequest == tripStatusChangeAction || loadingRequest == pickupInRouteRequest)}
           disabled={
-            (tripDetail.tripStatus == CONSTANTS.PickupArrived && !tripDetail.verifiy) ||
-            (tripDetail.tripStatus == CONSTANTS.ReturnArrived && !tripDetail.verifiy)
+            // (tripDetail?.tripStatus == CONSTANTS.PickupArrived && !tripDetail?.verifiy) ||
+            (tripDetail?.tripStatus == CONSTANTS.ReturnArrived && !tripDetail?.verifiy)
           }
           style={[
-            (tripDetail.tripStatus == CONSTANTS.PickupArrived ||
-              tripDetail.tripStatus == CONSTANTS.ReturnArrived) &&
-            !tripDetail.verifiy && { backgroundColor: Colors.gray },
+            (
+              // tripDetail?.tripStatus == CONSTANTS.PickupArrived ||
+              tripDetail?.tripStatus == CONSTANTS.ReturnArrived) &&
+            !tripDetail?.verifiy && { backgroundColor: Colors.gray },
           ]}
           title={buttonText(tripDetail)}
           onPress={_onButtonPress}
@@ -240,25 +287,23 @@ const TrackingFlow = () => {
           <Image style={styles.smallImg} source={Images.profileBlack} />
           <Text bold>
             {` `}
-            {tripDetail?.name}
+            {tripDetail?.customerId?.name}
           </Text>
         </Row>
-        <CallIcon mobileNumber={tripDetail?.mobileNumber} />
+        <CallIcon mobileNumber={tripDetail?.customerId?.phoneNumber} />
       </Row>
     );
   };
 
   const VehicleDetail = () => {
-
-
     return (
       <>
         <Row style={styles.pickupLocation}>
           <Image style={styles.smallImg} source={Images.vehicle} />
           <Text bold>
-            {` `} {tripDetail?.make} |{' '}
+            {` `} {tripDetail?.bookingId?.vehicle.make} {tripDetail?.bookingId?.vehicle.model} | {' '}
             <Text bold style={commonStyle.uppercaseText}>
-              {tripDetail?.plateNumber}
+              {tripDetail?.bookingId?.vehicle.regno}
             </Text>
           </Text>
         </Row>
@@ -270,14 +315,12 @@ const TrackingFlow = () => {
   const PickupLocation = () => {
     return (
       <>
-
         <Row style={styles.pickupLocation}>
           <Image style={styles.smallImg} source={Images.locationIcon} />
           <View>
             <Text bold>Picked Up Location</Text>
             <Text>
-              {tripDetail?.pickupLocation?.address}
-
+              {tripDetail?.pickup?.address}
             </Text>
           </View>
         </Row>
@@ -288,29 +331,24 @@ const TrackingFlow = () => {
             name='clockcircle'
             size={18}
             color={Colors.textColor}
-
           />
 
           <View style={{ marginLeft: 5 }}>
-            {tripDetail.parked ?
-              <Text semibold medium>Return : {moment(tripDetail.returnDate, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.returnTime}</Text>
+            {tripDetail?.parked ?
+              <Text semibold medium>Return : {moment(tripDetail?.bookingId?.to, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.returnTime}</Text>
               :
-              <Text semibold medium>Pickup : {moment(tripDetail.pickupDate, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.pickupTime}</Text>
+              <Text semibold medium>Pickup Date: {moment(tripDetail?.bookingId?.from, 'DD-MM-YYYY').format("DD-MM-YYYY")} {tripDetail?.pickupTime}</Text>
             }
           </View>
         </View>
-
-
-
       </>
     );
   };
 
   const OTP = () => {
     if (
-      (tripDetail.tripStatus == CONSTANTS.ReturnArrived ||
-        tripDetail.tripStatus == CONSTANTS.PickupArrived) &&
-      !tripDetail.verifiy
+      (tripDetail?.tripStatus == CONSTANTS.ReturnArrived ) &&
+      !tripDetail?.verifiy
     )
       return (
         <View>
@@ -334,7 +372,6 @@ const TrackingFlow = () => {
             />
             {(loading && loadingRequest == verifyTripOTPRequest)
               ?
-
               <View>
                 <ActivityIndicator
                   color={Colors.primary}
@@ -344,9 +381,7 @@ const TrackingFlow = () => {
               <TouchableOpacity style={styles.verifyButton} onPress={_verifyCode}>
                 <Text textColor={Colors.primary}>Verify</Text>
               </TouchableOpacity>
-
             }
-
           </Row>
         </View>
       );
@@ -354,17 +389,14 @@ const TrackingFlow = () => {
     else return null;
   };
 
-
   const origin = {
     ...location,
-    // longitude: 76.7860317,
-    // latitude: 30.6679559,
   };
+  
   const destination = {
-    longitude: tripDetail?.pickupLocation?.location.coordinates[0],
-    latitude: tripDetail?.pickupLocation?.location.coordinates[1],
+    longitude: tripDetail?.pickup?.location.coordinates[0],
+    latitude: tripDetail?.pickup?.location.coordinates[1],
   };
-
 
   const floatingComponent = () => {
     return (
@@ -376,31 +408,18 @@ const TrackingFlow = () => {
           flexDirection: 'row',
           display: 'flex',
         }}>
-
         <TouchableOpacity
           onPress={() => {
-
             showLocation({
               latitude: origin.latitude,
               longitude: origin.longitude,
-              sourceLatitude: destination.latitude, // optionally specify starting location for directions
-              sourceLongitude: destination.longitude, // not optional if sourceLatitude is specified
-
-              title: 'AirPort valet', // optional
-              googleForceLatLon: false, // optionally force GoogleMaps to use the latlon for the query instead of the title
-              // googlePlaceId: 'ChIJGVtI4by3t4kRr51d_Qm_x58', // optionally specify the google-place-id
-              alwaysIncludeGoogle: true, // optional, true will always add Google Maps to iOS and open in Safari, even if app is not installed (default: false)
-              // dialogTitle: 'This is the dialog Title', // optional (default: 'Open in Maps')
-              // dialogMessage: 'This is the amazing dialog Message', // optional (default: 'What app would you like to use?')
-              // cancelText: 'This is the cancel button text', // optional (default: 'Cancel')
-              // appsWhiteList: ['google-maps'], // optionally you can set which apps to show (default: will show all supported apps installed on device)
-              // naverCallerName: 'com.example.myapp', // to link into Naver Map You should provide your appname which is the bundle ID in iOS and applicationId in android.
-              // appTitles: { 'google-maps': 'My custom Google Maps title' }, // optionally you can override default app titles
-              // app: 'uber',  // optionally specify specific app to use
-              directionsMode: 'car', // optional, accepted values are 'car', 'walk', 'public-transport' or 'bike'
+              sourceLatitude: destination.latitude,
+              sourceLongitude: destination.longitude,
+              title: 'AirPort valet',
+              googleForceLatLon: false,
+              alwaysIncludeGoogle: true,
+              directionsMode: 'car',
             });
-
-
           }}
           style={{
             backgroundColor: 'white',
@@ -425,12 +444,8 @@ const TrackingFlow = () => {
           </Text>
         </TouchableOpacity>
 
-
         <TouchableOpacity
           onPress={() => {
-            // latitude: orderDetail?.driverRefId?.driverLocation?.coordinates[1],
-            // longitude: orderDetail?.driverRefId?.driverLocation?.coordinates[0],
-
             const region = {
               latitude: tripDetail?.driverRefId?.driverLocation?.coordinates[1],
               longitude: tripDetail?.driverRefId?.driverLocation?.coordinates[0],
@@ -438,17 +453,11 @@ const TrackingFlow = () => {
               longitudeDelta: 0.00921,
             };
 
-            // mapviewref?.current?.animateToRegion(region);
             mapviewref.current.animateCamera({
               center: region,
               pitch: 60,
               heading: 0,
-          })
-
-            // liveLocationRef.current = true
-
-
-            // driverLiveLocation
+            });
           }}
           style={{
             marginLeft: 10,
@@ -470,19 +479,14 @@ const TrackingFlow = () => {
     );
   };
 
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS == 'ios' ? 'padding' : null}
       style={{ flex: 1 }}
     >
-
-
-
       <ScrollView
         bounces={false}
         contentContainerStyle={{ flexGrow: 1 }}>
-
         <View style={{ flex: 1 }}>
           <MapView
             ref={mapviewref}
@@ -495,33 +499,26 @@ const TrackingFlow = () => {
             }}>
             
             <MapViewWithDirections
-
-              type={tripDetail.parked ? 'return' : 'pickup'}
+              type={tripDetail?.parked ? 'return' : 'pickup'}
               driverOnly={
-                tripDetail.tripStatus == CONSTANTS.PickupArrived ||
-                tripDetail.tripStatus == CONSTANTS.ReturnArrived ||
-                tripDetail.tripStatus == CONSTANTS.ParkingInRoute
+                tripDetail?.tripStatus == CONSTANTS.PickupArrived ||
+                tripDetail?.tripStatus == CONSTANTS.ReturnArrived ||
+                tripDetail?.tripStatus == CONSTANTS.ParkingInRoute
               }
-              sourceIcon={(tripDetail.tripStatus == CONSTANTS.Accepted || tripDetail.tripStatus == CONSTANTS.ParkingInRoute || tripDetail.parked) ? Images.car_top_2 : Images.captain }
-              sourceIconStyle={(tripDetail.tripStatus == CONSTANTS.Accepted || tripDetail.tripStatus == CONSTANTS.ParkingInRoute || tripDetail.parked) ? {} : {
-                backgroundColor:"white",
-                borderColor:Colors.primary+10,
-                borderWidth:1,borderRadius:5
-                ,overflow:"hidden"
-              } }
-              destinationIcon={(tripDetail.parked) ? Images.locationpin : Images.car_top_2 }
-
-
+              sourceIcon={Images.car_top_2}
+              sourceIconStyle={{
+                backgroundColor: "white",
+                borderColor: Colors.primary,
+                borderWidth: 2,
+                borderRadius: 30,
+                overflow: "hidden",
+                padding: 2
+              }}
+              destinationIcon={(tripDetail?.parked) ? Images.locationpin : Images.car_top_2}
               origin={origin}
               destination={destination}
-
-              // origin={tripDetail.parked ? origin : destination}
-              // destination={tripDetail.parked ? destination : origin}
-              // originIcon = {tripDetail.parked ? }
-
               onReady={result => {
-                console.log('soure', result);
-
+                console.log('source', result);
                 mapviewref?.current?.fitToCoordinates(result.coordinates, {
                   edgePadding: {
                     right: width / 20,
@@ -533,37 +530,66 @@ const TrackingFlow = () => {
               }}
             />
 
-
-{tripDetail.tripStatus == CONSTANTS.ParkingInRoute  ? null : 
+            {/* Driver Marker - Car Icon */}
             <MarkerAnimated
-              // rotation={rotation}
-              identifier={'Source'}
-              flat={false}
-              coordinate={userLiveLocation}
-              ref={userLiveMarkerRef}>
+              identifier={'Driver'}
+              flat={true}
+              coordinate={driverLiveLocation}
+              ref={driverMarkerRef}
+              anchor={{ x: 0.5, y: 0.5 }}>
               <View style={{
-                backgroundColor:"white",
-                borderColor:Colors.primary+10,
-                borderWidth:1,
-                borderRadius:5,
-                overflow:"hidden"}}>
+                backgroundColor: "white",
+                borderColor: Colors.primary,
+                borderWidth: 2,
+                borderRadius: 30,
+                overflow: "hidden",
+                padding: 5,
+                ...commonStyle.shadow
+              }}>
                 <Image
                   resizeMode="contain"
-                  source={Images.customerIcon}
+                  source={Images.car_top_2}
                   style={{
-                    height: 30,
-                    width: 30,
+                    height: 40,
+                    width: 40,
                     resizeMode: 'contain',
+                    tintColor: Colors.primary
                   }}
                 />
               </View>
-            </MarkerAnimated>}
+            </MarkerAnimated>
 
-
-
+            {/* Customer Marker - Person Icon */}
+            {tripDetail?.tripStatus != CONSTANTS.ParkingInRoute && (
+              <MarkerAnimated
+                identifier={'Customer'}
+                flat={false}
+                coordinate={customerLiveLocation}
+                ref={userLiveMarkerRef}>
+                <View style={{
+                  backgroundColor: "white",
+                  borderColor: Colors.secondary || '#FF6B6B',
+                  borderWidth: 2,
+                  borderRadius: 25,
+                  overflow: "hidden",
+                  padding: 5,
+                  ...commonStyle.shadow
+                }}>
+                  <Image
+                    resizeMode="contain"
+                    source={Images.customerIcon || Images.profileBlack}
+                    style={{
+                      height: 35,
+                      width: 35,
+                      resizeMode: 'contain',
+                      tintColor: Colors.secondary || '#FF6B6B'
+                    }}
+                  />
+                </View>
+              </MarkerAnimated>
+            )}
           </MapView>
           {floatingComponent()}
-
         </View>
 
         <View style={{ position: 'absolute', top: 0, left: 10, right: 10 }}>
@@ -595,9 +621,9 @@ const TrackingFlow = () => {
 export default TrackingFlow;
 
 function buttonText(trip) {
-  const isParked = trip.parked;
+  const isParked = trip?.parked;
 
-  switch (trip.tripStatus) {
+  switch (trip?.tripStatus) {
     case CONSTANTS.Accepted:
       if (isParked) {
         return 'Return In Route';
@@ -614,9 +640,7 @@ function buttonText(trip) {
       return 'Return Arrived';
     case CONSTANTS.ReturnArrived:
       return 'Completed';
-
     default:
       return '';
-      break;
   }
 }

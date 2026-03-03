@@ -7,12 +7,14 @@ import {
   selectTripRequest,
   removeTripRequest,
   parkingHistoryRequest,
+  selectTripDetailSuccess,
 } from './actions';
 import { PENDING_BOOKINGS, COMPLETED_BOOKINGS } from '../../container/app/mybooking/MyBooking';
 
 const initialState = {
   requestVisible: false,
   tripDetail: {},
+  selectedTripDetail: {},
   pendingRequests: [],
   upcomingBooking: [],
   pastBooking: [],
@@ -49,7 +51,6 @@ const reducer = createReducer(initialState, builder => {
         isLoadingMore: false,
       };
     } else {
-      // PENDING_BOOKINGS
       return {
         ...state,
         upcomingBooking: isLoadMore ? [...state.upcomingBooking, ...trips] : trips,
@@ -58,6 +59,20 @@ const reducer = createReducer(initialState, builder => {
         isLoadingMore: false,
       };
     }
+  });
+
+  builder.addCase(selectTripDetailSuccess, (state, action) => {
+    const selectedDetail = action.payload?.detail;
+    
+    console.log('🎯 selectTripDetailSuccess:', selectedDetail?._id);
+    
+    if (!selectedDetail?._id) return state;
+    
+    return {
+      ...state,
+      selectedTripDetail: selectedDetail,
+      tripDetail: selectedDetail,
+    };
   });
 
   builder.addCase(closeRequestModalAction, (state, action) => {
@@ -108,7 +123,7 @@ const reducer = createReducer(initialState, builder => {
       const filteredRequests = state.pendingRequests.filter(
         req => req?._id !== updatedRequest._id
       );
-      console.log('📊 After filtering - pending count:', filteredRequests) ;
+      console.log('📊 After filtering - pending count:', filteredRequests);
       return {
         ...state,
         pendingRequests: filteredRequests,
