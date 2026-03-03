@@ -226,7 +226,6 @@ const TrackingFlow = () => {
       tripId: tripDetail?._id,
     };
     console.log('Button Pressed with tripStatus:', tripDetail?.tripStatus);
-    // Use specific action for PickupInRoute
     if (tripDetail?.tripStatus === CONSTANTS.Accepted) {
       alert('Pickup In Route', 'Are you sure you want to mark as arrived for pickup?');
       dispatch(pickupInRouteRequest({
@@ -247,7 +246,6 @@ const TrackingFlow = () => {
     }
     
     else {
-      // Use general status change for other statuses
       dispatch(tripStatusChangeAction({ data }));
     }
   };

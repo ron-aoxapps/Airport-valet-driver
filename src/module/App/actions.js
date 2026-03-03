@@ -10,13 +10,9 @@ export const carParkingSuccess = createAction('carParking/success');
 
 export const tripDetailRequest = createAction('tripDetail/request');
 export const tripDetailSuccess = createAction('tripDetail/success');
-
-// Actions for multiple requests
 export const addNewTripRequest = createAction('ADD_NEW_TRIP_REQUEST');
 export const selectTripRequest = createAction('SELECT_TRIP_REQUEST');
 export const removeTripRequest = createAction('REMOVE_TRIP_REQUEST');
-
-// Action for selecting trip detail from a separate request
 export const selectTripDetailSuccess = createAction('SELECT_TRIP_DETAIL_SUCCESS');
 
 export const closeRequestModalAction = createAction('closeRequestModal');
