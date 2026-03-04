@@ -2,7 +2,7 @@ import SplashScreen from 'react-native-splash-screen';
 import {takeEvery, put} from 'redux-saga/effects';
 import {ENDPOINT, SUCCESS} from '../../config';
 import {navigationRef} from '../../navigation/rootNavigation';
-import {get, postAPI} from '../../utils/api';
+import {get, postAPI, put as putAPI} from '../../utils/api';
 import {getUserId} from '../../utils/authentication';
 import {popupType, showPopup} from '../../utils/commonFunction';
 import {hideLoader, sendOTPFail, showLoader} from '../Common/actions';
@@ -72,22 +72,80 @@ function* onchangePasswordRequest({payload}) {
   }
 }
 
+// function* onUpdateProfile({payload}) {
+//   yield put(showLoader());
+//   try {
+//     const response = yield postAPI('driver/updateprofile', payload.data, false);
+//     if (response.data.status == SUCCESS) {
+//       showPopup(
+//         popupType.success,
+//         'Profile has been updated successfully.',
+//         'Update Profile',
+//       );
+//       yield put(profileRequest());
+//       yield put(hideLoader());
+//     } else {
+//       yield put(hideLoader());
+//     }
+//   } catch (error) {
+//     yield put(hideLoader());
+//   }
+// }
+
 function* onUpdateProfile({payload}) {
   yield put(showLoader());
   try {
-    const response = yield postAPI('driver/updateprofile', payload.data, false);
-    if (response.data.status == SUCCESS) {
+    // Create FormData
+    const form = new FormData();
+    form.append('countryCode', payload.data.countryCode);
+    form.append('phoneNumber', payload.data.phoneNumber);
+    form.append('address', payload.data.address);
+    form.append('name', payload.data.name);
+    
+    // Handle profile image if it exists and is a new image (starts with file://)
+    if (payload.data.profileImage && payload.data.profileImage.startsWith('file://')) {
+      const imageUri = payload.data.profileImage;
+      const imageName = imageUri.split('/').pop();
+      const imageType = `image/${imageName.split('.').pop()}`;
+      
+      form.append('profilePicture', {
+        uri: imageUri,
+        type: imageType,
+        name: imageName,
+      });
+    } else {
+      // If no new image, send empty string or existing image URL
+      form.append('profilePicture', payload.data.profileImage || '');
+    }
+
+    console.log('FormData being sent:', form);
+    
+    // Use putAPI for PUT request
+    const response = yield putAPI(ENDPOINT.common_settings, form, true);
+
+    if (response.data.success) {
       showPopup(
         popupType.success,
         'Profile has been updated successfully.',
         'Update Profile',
       );
-      yield put(profileRequest());
+      yield put(profileRequest()); // Refresh profile data
       yield put(hideLoader());
     } else {
+      showPopup(
+        popupType.error,
+        response.data.message || 'Failed to update profile',
+        'Error',
+      );
       yield put(hideLoader());
     }
   } catch (error) {
+    console.log('Update Profile Error:', error);
+    showPopup(
+      popupType.error,
+      'An error occurred while updating profile',
+      'Error',
+    );
     yield put(hideLoader());
   }
 }

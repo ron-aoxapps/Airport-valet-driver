@@ -9,4 +9,5 @@ export const ENDPOINT = {
   addNewVehicle: 'cars/addcar',
   getcarsList: 'cars/getcarslist',
   removecar: 'cars/removecar',
+  common_settings: 'common/settings',
 };

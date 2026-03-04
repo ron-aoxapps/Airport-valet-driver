@@ -702,7 +702,7 @@ function buttonText(trip, isOtpFilled = false) {
   switch (trip?.tripStatus) {
     case CONSTANTS.Accepted:
       if (isParked) {
-        return 'Accept Return';
+        return 'Return In Route';
       } else {
         return 'Pickup In Route';
       }
