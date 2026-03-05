@@ -24,12 +24,9 @@ import {
 
 const popAction = StackActions.pop(2);
 // adminSetting/getBasicSettingInfo
- 
 function* onImageUpload({payload}) {
   try {
     const data = payload.data;   
-    console.log('payload ', payload);
-
     const response = yield postAPI(ENDPOINT.upload, data);
     if (response.data.status == SUCCESS) {
       payload.callback({status: 'success', response: response.data.data});
