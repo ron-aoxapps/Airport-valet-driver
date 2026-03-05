@@ -116,26 +116,17 @@ const Editprofile = () => {
 
   const onUpdateProfile = () => {
     if (!validateForm()) return;
-
-    // Prepare data for API
     const data = {
       name: state.name,
       phoneNumber: state.phoneNumber,
       address: state.address,
       countryCode: state.countryCode.code,
     };
-
-    // Only include profileImage if it was changed
     if (isImageChanged && state.profileImage) {
       data.profileImage = state.profileImage;
     } else {
-      data.profileImage = ''; // Send empty string if no change
+      data.profileImage = '';
     }
-
-    // Note: email is not included as it might not be editable
-    // If email is editable, uncomment the line below
-    // data.email = state.email;
-
     dispatch(updateProfileRequest({data}));
     setIsEditing(false);
   };
