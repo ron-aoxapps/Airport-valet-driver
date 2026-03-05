@@ -24,10 +24,10 @@ import {
 
 const popAction = StackActions.pop(2);
 // adminSetting/getBasicSettingInfo
-
+ 
 function* onImageUpload({payload}) {
   try {
-    const data = payload.data;
+    const data = payload.data;   
     console.log('payload ', payload);
 
     const response = yield postAPI(ENDPOINT.upload, data);
