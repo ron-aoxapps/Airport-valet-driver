@@ -27,6 +27,7 @@ import { useProfileSelector } from '../../../module/customSelector';
 
 export const PENDING_BOOKINGS = 'PENDING';
 export const COMPLETED_BOOKINGS = 'COMPLETED';
+export const ACCEPTED_BOOKINGS = "ACCEPTED";
 
 const PAGE_SIZE = 10;
 
@@ -251,7 +252,7 @@ const MyBooking = () => {
   return (
     <Container drawer title={'My Booking'}>
       <Tabs
-        tabs={[PENDING_BOOKINGS, COMPLETED_BOOKINGS]}
+        tabs={[PENDING_BOOKINGS, ACCEPTED_BOOKINGS, COMPLETED_BOOKINGS]}
         selectedTab={selectedTab}
         onChange={tab => setSelectedTab(tab)}
       />
@@ -346,7 +347,7 @@ export const CurrentBooking = ({ currentBooking = [], dispatch }) => {
 
     return (
       <View>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           onPress={() => _onTripClick(item, dispatch)}
           style={[styles.itemContainer, { padding: 0, overflow: "hidden" }]}>
           <GradientWrap style={{ padding: 10 }}>
@@ -415,7 +416,7 @@ export const CurrentBooking = ({ currentBooking = [], dispatch }) => {
               </Text>
             </Row>
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     );
   }

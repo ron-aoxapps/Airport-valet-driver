@@ -300,13 +300,13 @@ const RequestView = () => {
     );
   };
 
-  const ListHeaderComponent = () => (
-    <View style={styles.listHeader}>
-      <Text style={styles.headerTitle}>
-        {pendingRequests.length} Pending Request{pendingRequests.length !== 1 ? 's' : ''}
-      </Text>
-    </View>
-  );
+  // const ListHeaderComponent = () => (
+  //   <View style={styles.listHeader}>
+  //     <Text style={styles.headerTitle}>
+  //       {pendingRequests.length} Pending Request{pendingRequests.length !== 1 ? 's' : ''}
+  //     </Text>
+  //   </View>
+  // );
 
   const ListEmptyComponent = () => (
     <View style={styles.emptyContainer}>
@@ -352,7 +352,7 @@ const RequestView = () => {
             keyExtractor={(item) => item._id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={ListHeaderComponent}
+            // ListHeaderComponent={ListHeaderComponent}
             ListEmptyComponent={ListEmptyComponent}
           />
         </SafeAreaView>

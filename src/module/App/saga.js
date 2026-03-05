@@ -1,6 +1,6 @@
 import { takeEvery, put } from 'redux-saga/effects';
 import { CONSTANTS, SUCCESS } from '../../config';
-import { COMPLETED_BOOKINGS } from '../../container/app/mybooking/MyBooking';
+import { COMPLETED_BOOKINGS, PENDING_BOOKINGS, ACCEPTED_BOOKINGS } from '../../container/app/mybooking/MyBooking';
 import { navigationRef } from '../../navigation/rootNavigation';
 import { get, postAPI } from '../../utils/api';
 import { hideLoader, showLoader } from '../Common/actions';
@@ -48,7 +48,16 @@ function* onParkingHistoryRequest({ payload }) {
 
   try {
     const { type, page = 1, limit = 10, isLoadMore = false } = payload || {};  
-    const status = type === COMPLETED_BOOKINGS ? 'Completed' : '';
+    
+    // Determine status based on tab type
+    let status = '';
+    if (type === PENDING_BOOKINGS) {
+      status = 'FindingDrivers';
+    } else if (type === ACCEPTED_BOOKINGS) {
+      status = '';
+    } else if (type === COMPLETED_BOOKINGS) {
+      status = 'Completed';
+    }
     
     const response = yield get(
       `driver/trips/available?page=${page}&limit=${limit}&status=${status}`, 
