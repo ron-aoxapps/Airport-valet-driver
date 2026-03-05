@@ -6,7 +6,7 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
   
 
-platform :ios, min_ios_version_supported
+platform :ios, '16.0'
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -50,6 +50,11 @@ target 'AirportValetDriver' do
             build_phase.input_paths.reject! { |path| path.include?('rnreanimated-generated.mm') }
           end
         end
+      end
+      
+      # Set minimum deployment target to iOS 16.0 for all pods
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
       end
     end
   end
